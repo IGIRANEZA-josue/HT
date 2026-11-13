@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const location = require('../controller/locationcontroller');
-const auth = require('../middleware/authMiddleware');
+const auth = require('../middleware/authmiddleware');
 const protect = auth.authMiddleware || auth;
 
 router.get('/locations', location.getLocations);

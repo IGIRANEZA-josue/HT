@@ -12,7 +12,7 @@ const {
     Deleteuser
 } = require('../controller/usercontroller');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
 
 
 // Check that the token belongs to a normal user

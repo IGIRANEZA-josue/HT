@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const property = require('../controller/propertycontroller');
-const auth = require('../middleware/authMiddleware');
+const auth = require('../middleware/authMmddleware');
 const protect = auth.authMiddleware || auth;
 
 router.get('/properties', property.getProperties);

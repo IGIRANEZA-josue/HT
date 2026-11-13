@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const favorite = require('../controller/favoriteController');
-const auth = require('../middleware/authMiddleware');
+const auth = require('../middleware/authmiddleware');
 const protect = auth.authMiddleware || auth;
 
 router.get('/favorites', protect, favorite.getFavorites);

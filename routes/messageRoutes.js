@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const message = require('../controller/messageController');
-const auth = require('../middleware/authMiddleware');
+const auth = require('../middleware/authmiddleware');
 const protect = auth.authMiddleware || auth;
 
 router.post('/messages', protect, message.sendMessage);

@@ -1,11 +1,11 @@
 
 const db = require('../db/db.js');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const generateToken = require('../utils/generatetoken');
 
 
 // ADD ADMIN
-// This function must be protected by admin authentication in the routes.
+// Only an authenticated administrator should access this function.
 const Addadmin = async (req, res) => {
     try {
         const { username, Akey, password, department } = req.body;
@@ -22,8 +22,10 @@ const Addadmin = async (req, res) => {
             });
         }
 
+        // Check duplicate username or admin key
         const [existing] = await db.query(
-            'SELECT id FROM admin WHERE usern = ? OR Akey = ?',
+            `SELECT id FROM admin
+             WHERE usern = ? OR Akey = ?`,
             [username, Akey]
         );
 
@@ -33,13 +35,20 @@ const Addadmin = async (req, res) => {
             });
         }
 
+        // Hash admin password
         const hashedPassword = await bcrypt.hash(password, 10);
 
         await db.query(
             `INSERT INTO admin
             (usern, Akey, pass, role, department)
             VALUES (?, ?, ?, ?, ?)`,
-            [username, Akey, hashedPassword, 'admin', department || 'General']
+            [
+                username,
+                Akey,
+                hashedPassword,
+                'admin',
+                department || 'General'
+            ]
         );
 
         return res.status(201).json({
@@ -48,6 +57,7 @@ const Addadmin = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not create admin'
         });
@@ -79,6 +89,7 @@ const Loginadmin = async (req, res) => {
 
         const admin = admins[0];
 
+        // Compare password with hashed password
         const passwordMatch = await bcrypt.compare(
             password,
             admin.pass
@@ -90,14 +101,11 @@ const Loginadmin = async (req, res) => {
             });
         }
 
-        const token = jwt.sign(
-            {
-                id: admin.id,
-                role: 'admin',
-                accountType: 'admin'
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '1d' }
+        // Generate admin JWT
+        const token = generateToken(
+            admin.id,
+            'admin',
+            'admin'
         );
 
         return res.status(200).json({
@@ -107,6 +115,7 @@ const Loginadmin = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Admin login failed'
         });
@@ -119,7 +128,8 @@ const Getmyadmin = async (req, res) => {
     try {
         const [admins] = await db.query(
             `SELECT id, usern, role, department
-             FROM admin WHERE id = ?`,
+             FROM admin
+             WHERE id = ?`,
             [req.user.id]
         );
 
@@ -136,6 +146,7 @@ const Getmyadmin = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not retrieve admin profile'
         });
@@ -153,11 +164,12 @@ const Getalladmins = async (req, res) => {
 
         return res.status(200).json({
             message: 'Admins retrieved successfully',
-            admins: admins
+            admins
         });
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not retrieve admins'
         });
@@ -168,10 +180,19 @@ const Getalladmins = async (req, res) => {
 // GET ONE ADMIN
 const Get1admin = async (req, res) => {
     try {
+        const adminId = Number(req.params.id);
+
+        if (!Number.isInteger(adminId) || adminId <= 0) {
+            return res.status(400).json({
+                message: 'Invalid admin ID'
+            });
+        }
+
         const [admins] = await db.query(
             `SELECT id, usern, role, department
-             FROM admin WHERE id = ?`,
-            [req.params.id]
+             FROM admin
+             WHERE id = ?`,
+            [adminId]
         );
 
         if (admins.length === 0) {
@@ -187,6 +208,7 @@ const Get1admin = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not retrieve admin'
         });
@@ -194,14 +216,21 @@ const Get1admin = async (req, res) => {
 };
 
 
-// DELETE AN ADMIN
+// DELETE ADMIN
 const Deleteadmin = async (req, res) => {
     try {
         const adminId = Number(req.params.id);
 
+        if (!Number.isInteger(adminId) || adminId <= 0) {
+            return res.status(400).json({
+                message: 'Invalid admin ID'
+            });
+        }
+
+        // Prevent administrator from deleting their own account
         if (adminId === Number(req.user.id)) {
             return res.status(400).json({
-                message: 'You cannot delete your own admin account here'
+                message: 'You cannot delete your own admin account'
             });
         }
 
@@ -222,6 +251,7 @@ const Deleteadmin = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not delete admin'
         });

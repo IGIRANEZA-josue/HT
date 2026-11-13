@@ -11,7 +11,7 @@ const {
     Deleteadmin
 } = require('../controller/admincontroller');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
 
 
 // Ensure the token belongs to an administrator

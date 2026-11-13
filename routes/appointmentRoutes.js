@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const appointment = require('../controller/appointmentController');
-const auth = require('../middleware/authMiddleware');
+const auth = require('../middleware/authmiddleware');
 const protect = auth.authMiddleware || auth;
 
 router.post('/appointments', protect, appointment.createAppointment);

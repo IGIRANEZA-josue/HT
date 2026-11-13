@@ -1,7 +1,8 @@
 
 const db = require('../db/db.js');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const generateToken = require('../utils/generatetoken');
+
 
 // REGISTER USER
 const Adduser = async (req, res) => {
@@ -26,7 +27,7 @@ const Adduser = async (req, res) => {
             });
         }
 
-        // Users cannot register as administrators
+        // Only seekers and landlords can register
         const userRole = role || 'seeker';
 
         if (!['seeker', 'landlord'].includes(userRole)) {
@@ -35,6 +36,7 @@ const Adduser = async (req, res) => {
             });
         }
 
+        // Check duplicate username and email
         const [existing] = await db.query(
             'SELECT id FROM htracker WHERE usern = ? OR email = ?',
             [username, email]
@@ -46,13 +48,22 @@ const Adduser = async (req, res) => {
             });
         }
 
+        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Insert user
         await db.query(
             `INSERT INTO htracker
             (name, usern, email, pass, role, department)
             VALUES (?, ?, ?, ?, ?, ?)`,
-            [name, username, email, hashedPassword, userRole, 'General']
+            [
+                name,
+                username,
+                email,
+                hashedPassword,
+                userRole,
+                'General'
+            ]
         );
 
         return res.status(201).json({
@@ -61,6 +72,7 @@ const Adduser = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Registration failed'
         });
@@ -92,6 +104,7 @@ const Loginuser = async (req, res) => {
 
         const user = users[0];
 
+        // Compare password with hashed password
         const passwordMatch = await bcrypt.compare(
             password,
             user.pass
@@ -103,14 +116,11 @@ const Loginuser = async (req, res) => {
             });
         }
 
-        const token = jwt.sign(
-            {
-                id: user.id,
-                role: user.role,
-                accountType: 'user'
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '1d' }
+        // Generate JWT
+        const token = generateToken(
+            user.id,
+            user.role,
+            'user'
         );
 
         return res.status(200).json({
@@ -120,6 +130,7 @@ const Loginuser = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Login failed'
         });
@@ -150,6 +161,7 @@ const Getmyprofile = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not retrieve profile'
         });
@@ -175,7 +187,8 @@ const Updateuser = async (req, res) => {
         }
 
         const [existing] = await db.query(
-            'SELECT id FROM htracker WHERE email = ? AND id != ?',
+            `SELECT id FROM htracker
+             WHERE email = ? AND id != ?`,
             [email, req.user.id]
         );
 
@@ -186,7 +199,9 @@ const Updateuser = async (req, res) => {
         }
 
         await db.query(
-            'UPDATE htracker SET name = ?, email = ? WHERE id = ?',
+            `UPDATE htracker
+             SET name = ?, email = ?
+             WHERE id = ?`,
             [name, email, req.user.id]
         );
 
@@ -196,6 +211,7 @@ const Updateuser = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not update profile'
         });
@@ -213,11 +229,12 @@ const Getallusers = async (req, res) => {
 
         return res.status(200).json({
             message: 'Users retrieved successfully',
-            users: users
+            users
         });
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not retrieve users'
         });
@@ -228,10 +245,19 @@ const Getallusers = async (req, res) => {
 // GET ONE USER (ADMIN ONLY)
 const Get1user = async (req, res) => {
     try {
+        const userId = Number(req.params.id);
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+            return res.status(400).json({
+                message: 'Invalid user ID'
+            });
+        }
+
         const [users] = await db.query(
             `SELECT id, name, usern, email, role, department
-             FROM htracker WHERE id = ?`,
-            [req.params.id]
+             FROM htracker
+             WHERE id = ?`,
+            [userId]
         );
 
         if (users.length === 0) {
@@ -247,6 +273,7 @@ const Get1user = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
             message: 'Could not retrieve user'
         });
@@ -257,10 +284,16 @@ const Get1user = async (req, res) => {
 // DELETE MY ACCOUNT
 const Deleteuser = async (req, res) => {
     try {
-        await db.query(
+        const [result] = await db.query(
             'DELETE FROM htracker WHERE id = ?',
             [req.user.id]
         );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: 'User not found'
+            });
+        }
 
         return res.status(200).json({
             message: 'Account deleted successfully'
@@ -268,8 +301,9 @@ const Deleteuser = async (req, res) => {
 
     } catch (error) {
         console.log(error.message);
+
         return res.status(500).json({
-            message: 'Could not delete account'
+            message: 'Could not delete account. Check related records.'
         });
     }
 };
