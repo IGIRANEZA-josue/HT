@@ -1,9 +1,29 @@
-const router = require('express').Router();
-const requests = require('../controller/rentalRequestController');
-const auth = require('../middleware/authmiddleware');
-const protect = auth.authMiddleware || auth;
 
-router.post('/rental-requests', protect, requests.createRentalRequest);
-router.get('/rental-requests/my', protect, requests.getMyRentalRequests);
+const express = require('express');
+const router = express.Router();
+
+const {
+    Addrentalrequest,
+    Getmyrentalrequests
+} = require('../controller/rentalRequestController');
+
+const authMiddleware = require('../middleware/authMiddleware');
+
+const seekerOnly = (req, res, next) => {
+    if (
+        !req.user ||
+        req.user.accountType !== 'user' ||
+        req.user.role !== 'seeker'
+    ) {
+        return res.status(403).json({
+            message: 'Seeker access required'
+        });
+    }
+    next();
+};
+
+// SEEKER ONLY
+router.post('/addrentalrequest', authMiddleware, seekerOnly, Addrentalrequest);
+router.get('/getmyrentalrequests', authMiddleware, seekerOnly, Getmyrentalrequests);
 
 module.exports = router;

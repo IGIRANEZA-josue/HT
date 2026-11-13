@@ -11,10 +11,8 @@ const {
     Deleteadmin
 } = require('../controller/admincontroller');
 
-const authMiddleware = require('../middleware/authmiddleware');
+const authMiddleware = require('../middleware/authMiddleware');
 
-
-// Ensure the token belongs to an administrator
 const adminOnly = (req, res, next) => {
     if (
         !req.user ||
@@ -29,21 +27,14 @@ const adminOnly = (req, res, next) => {
     next();
 };
 
+// PUBLIC
+router.post('/loginadmin', Loginadmin);
 
-// PUBLIC ADMIN LOGIN
-router.post('/login', Loginadmin);
-
-
-// PROTECTED ADMIN ROUTES
-router.post('/register', authMiddleware, adminOnly, Addadmin);
-
-router.get('/me', authMiddleware, adminOnly, Getmyadmin);
-
-router.get('/', authMiddleware, adminOnly, Getalladmins);
-
-router.get('/:id', authMiddleware, adminOnly, Get1admin);
-
-router.delete('/:id', authMiddleware, adminOnly, Deleteadmin);
-
+// ADMIN ONLY
+router.post('/addadmin', authMiddleware, adminOnly, Addadmin);
+router.get('/getmyadmin', authMiddleware, adminOnly, Getmyadmin);
+router.get('/getalladmins', authMiddleware, adminOnly, Getalladmins);
+router.get('/getadmin/:id', authMiddleware, adminOnly, Get1admin);
+router.delete('/deleteadmin/:id', authMiddleware, adminOnly, Deleteadmin);
 
 module.exports = router;

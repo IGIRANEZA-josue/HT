@@ -12,10 +12,10 @@ const {
     Deleteuser
 } = require('../controller/usercontroller');
 
-const authMiddleware = require('../middleware/authmiddleware');
+const authMiddleware = require('../middleware/authMiddleware');
 
 
-// Check that the token belongs to a normal user
+// USER ONLY
 const userOnly = (req, res, next) => {
     if (!req.user || req.user.accountType !== 'user') {
         return res.status(403).json({
@@ -27,9 +27,13 @@ const userOnly = (req, res, next) => {
 };
 
 
-// Check that the token belongs to an admin
+// ADMIN ONLY
 const adminOnly = (req, res, next) => {
-    if (!req.user || req.user.accountType !== 'admin') {
+    if (
+        !req.user ||
+        req.user.accountType !== 'admin' ||
+        req.user.role !== 'admin'
+    ) {
         return res.status(403).json({
             message: 'Administrator access required'
         });
@@ -40,19 +44,19 @@ const adminOnly = (req, res, next) => {
 
 
 // PUBLIC ROUTES
-router.post('/register', Adduser);
-router.post('/login', Loginuser);
+router.post('/registeruser', Adduser);
+router.post('/loginuser', Loginuser);
 
 
-// USER TOKEN ROUTES
-router.get('/me', authMiddleware, userOnly, Getmyprofile);
-router.put('/me', authMiddleware, userOnly, Updateuser);
-router.delete('/me', authMiddleware, userOnly, Deleteuser);
+// USER ROUTES
+router.get('/getmyprofile', authMiddleware, userOnly, Getmyprofile);
+router.put('/updateuser', authMiddleware, userOnly, Updateuser);
+router.delete('/deleteuser', authMiddleware, userOnly, Deleteuser);
 
 
-// ADMIN-ONLY USER MANAGEMENT
-router.get('/', authMiddleware, adminOnly, Getallusers);
-router.get('/:id', authMiddleware, adminOnly, Get1user);
+// ADMIN USER MANAGEMENT ROUTES
+router.get('/getallusers', authMiddleware, adminOnly, Getallusers);
+router.get('/getuser/:id', authMiddleware, adminOnly, Get1user);
 
 
 module.exports = router;
