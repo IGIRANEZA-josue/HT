@@ -1,6 +1,6 @@
 const db = require('../db/db.js');
 exports.getProperties = async (req,res) => {
- try { const [rows]=await db.query('SELECT p.*,l.province,l.district,l.sector,u.name AS landlord_name FROM properties p JOIN locations l ON p.location_id=l.id JOIN users u ON p.landlord_id=u.id ORDER BY p.created_at DESC'); res.json(rows); }
+ try { const [rows]=await db.query('SELECT p.*, l.province, l.district, l.sector, u.name AS landlord_name, (SELECT image_url FROM property_images WHERE property_id = p.id ORDER BY id LIMIT 1) AS image_url FROM properties p JOIN location l ON p.location_id=l.id JOIN htracker u ON p.landlord_id=u.id ORDER BY p.created_at DESC'); res.json(rows); }
  catch(e) { console.error(e); res.status(500).json({message:'Could not get properties'}); }
 };
 exports.getProperty = async (req,res) => {

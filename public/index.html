@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f8f4">
+  <title>H-Tracker | Find a place to belong</title>
+  <meta name="description" content="Discover your next home in Rwanda with H-Tracker.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-wrap container">
+      <a href="#top" class="brand" aria-label="H-Tracker home"><span class="brand-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3V10.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span>h<span class="brand-dash">-</span>tracker<span class="brand-dot">.</span></span></a>
+      <nav class="desktop-nav" aria-label="Main navigation"><a class="active" href="#discover">Discover</a><a href="#how-it-works">How it works</a><a href="#about">About us</a></nav>
+      <div class="nav-actions"><button class="text-button" id="signin">Log in</button><button class="button button-dark" id="signup">Get started <span>↗</span></button></div>
+      <button class="menu-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
+    </div>
+    <nav class="mobile-nav" aria-label="Mobile navigation"><a href="#discover">Discover</a><a href="#how-it-works">How it works</a><a href="#about">About us</a><button id="mobile-login">Log in</button><button id="mobile-signup">Get started</button></nav>
+  </header>
+  <main id="top">
+    <section class="hero container" id="discover">
+      <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> A BETTER WAY TO FIND HOME</div><h1>Find a place<br>to <em>belong.</em></h1><p>From the first search to the front door, we’re here to help you find a home that feels just right.</p><a href="#listings" class="hero-link">Explore homes <span>↗</span></a></div>
+      <div class="hero-image"><img src="/images/hero.png" alt="Modern home surrounded by greenery"><div class="hero-image-tag"><span class="tag-icon">⌂</span><span><strong>Made for living</strong><small>Find a space that feels like you.</small></span></div></div>
+      <form class="search-box" id="search-form"><div class="search-intro"><span class="search-icon">⌕</span><div><strong>Find your place</strong><small>Your next chapter starts here</small></div></div><label><span>LOCATION</span><input id="location" placeholder="Where do you want to live?"></label><label><span>PROPERTY TYPE</span><select id="type"><option value="">All types</option><option>House</option><option>Apartment</option><option>Villa</option></select></label><label><span>MAX. MONTHLY RENT</span><select id="price"><option value="">Any price</option><option value="500000">Up to RWF 500,000</option><option value="1000000">Up to RWF 1,000,000</option><option value="2000000">Up to RWF 2,000,000</option></select></label><button class="button button-dark search-submit" type="submit">Search homes <span>↗</span></button></form>
+    </section>
+    <section class="listings-section container" id="listings"><div class="section-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span> THE GOOD LIFE STARTS HERE</div><h2>Places worth coming home to<span class="green-dot">.</span></h2><p>A little inspiration for your next move.</p></div><button class="outline-button" id="view-all">View all homes <span>↗</span></button></div>
+      <div class="listing-toolbar"><div class="tabs" role="group" aria-label="Filter properties"><button class="tab active" data-filter="all">All homes</button><button class="tab" data-filter="House">Houses</button><button class="tab" data-filter="Apartment">Apartments</button><button class="tab" data-filter="saved">Saved <span id="saved-count">0</span></button></div><span class="results" id="results"></span></div>
+      <div class="notice" id="demo-notice" hidden><span>✦</span> You’re viewing example homes while live listings are unavailable.</div><div class="cards" id="cards" aria-live="polite"></div><div class="empty-state" id="empty-state" hidden><strong>No homes found just yet.</strong><p>Try another search or explore all homes.</p><button class="outline-button" id="clear-filters">Clear filters ↗</button></div>
+    </section>
+    <section class="why-section" id="how-it-works"><div class="container why-inner"><div class="why-heading"><div class="eyebrow"><span class="eyebrow-dot"></span> A LITTLE EASIER, EVERY STEP</div><h2>Finding home should<br>feel good<span class="green-dot">.</span></h2><p>Less searching, more living. We’re making it easier to find a place you love.</p><a href="#listings" class="button button-dark">Find your home <span>↗</span></a></div><div class="features"><article><span class="feature-icon">⌕</span><div><h3>Discover your kind of place</h3><p>Explore homes that match what you’re looking for, all in one place.</p></div><span class="feature-number">01</span></article><article><span class="feature-icon">♡</span><div><h3>Keep the ones you love</h3><p>Save your favorites and come back to them whenever you’re ready.</p></div><span class="feature-number">02</span></article><article><span class="feature-icon">⌂</span><div><h3>Make your next move</h3><p>Find a space that feels right and start your next chapter.</p></div><span class="feature-number">03</span></article></div></div></section>
+    <section class="bottom-cta container" id="about"><div><div class="eyebrow"><span class="eyebrow-dot light"></span> THERE’S NO PLACE LIKE HOME</div><h2>Ready for your<br>next chapter?</h2><p>Let’s find a place that feels like yours.</p><a class="button button-light" href="#listings">Explore homes <span>↗</span></a></div><div class="cta-art" aria-hidden="true"><span>⌂</span><small>YOUR NEXT<br>CHAPTER AWAITS</small></div></section>
+  </main>
+  <footer class="container footer"><a href="#top" class="brand"><span class="brand-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3V10.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span>h-tracker<span class="brand-dot">.</span></span></a><p>Find a place to belong.</p><span>Made for finding home in Rwanda ♡</span><small>© 2026 H-Tracker</small></footer>
+  <dialog id="dialog"><div class="dialog-header"><div><span class="dialog-kicker">H-TRACKER</span><h2 id="dialog-title"></h2></div><button class="close-dialog" aria-label="Close">×</button></div><div id="dialog-content"></div></dialog>
+  <div class="toast" id="toast" role="status"></div>
+</body>
+</html>
