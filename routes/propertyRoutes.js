@@ -3,12 +3,12 @@ const express = require('express');
 const router = express.Router();
 
 const {
-    Addproperty,
-    Getallproperties,
-    Get1property,
-    Updateproperty,
-    Deleteproperty,
-    Addpropertyimage
+    addProperty: Addproperty,
+    getProperties: Getallproperties,
+    getProperty: Get1property,
+    updateProperty: Updateproperty,
+    deleteProperty: Deleteproperty,
+    addPropertyImage: Addpropertyimage
 } = require('../controller/propertycontroller');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -38,6 +38,6 @@ router.get('/getproperty/:id', Get1property);
 router.post('/addproperty', authenticated, landlordOnly, Addproperty);
 router.put('/updateproperty/:id', authenticated, landlordOnly, Updateproperty);
 router.delete('/deleteproperty/:id', authenticated, landlordOnly, Deleteproperty);
-router.post('/addpropertyimage', authenticated, landlordOnly, Addpropertyimage);
+router.post('/addpropertyimage/:id', authenticated, landlordOnly, Addpropertyimage);
 
 module.exports = router;
