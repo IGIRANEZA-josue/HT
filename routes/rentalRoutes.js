@@ -3,8 +3,8 @@ const express = require('express');
 const router = express.Router();
 
 const {
-    Addrentalrequest,
-    Getmyrentalrequests
+    createRentalRequest,
+    getMyRentalRequests
 } = require('../controller/rentalRequestController');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -19,11 +19,13 @@ const seekerOnly = (req, res, next) => {
             message: 'Seeker access required'
         });
     }
+
     next();
 };
 
 // SEEKER ONLY
-router.post('/addrentalrequest', authMiddleware, seekerOnly, Addrentalrequest);
-router.get('/getmyrentalrequests', authMiddleware, seekerOnly, Getmyrentalrequests);
+router.post('/addrentalrequest', authMiddleware, seekerOnly, createRentalRequest);
+
+router.get('/getmyrentalrequests', authMiddleware, seekerOnly, getMyRentalRequests);
 
 module.exports = router;

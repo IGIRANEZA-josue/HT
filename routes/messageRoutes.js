@@ -3,8 +3,8 @@ const express = require('express');
 const router = express.Router();
 
 const {
-    Addmessage,
-    Getconversation
+    sendMessage,
+    getConversation
 } = require('../controller/messageController');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -15,10 +15,14 @@ const userOnly = (req, res, next) => {
             message: 'User account access required'
         });
     }
+
     next();
 };
 
-router.post('/sendmessage', authMiddleware, userOnly, Addmessage);
-router.get('/getconversation/:receiverId', authMiddleware, userOnly, Getconversation);
+// SEND MESSAGE
+router.post('/sendmessage', authMiddleware, userOnly, sendMessage);
+
+// GET CONVERSATION
+router.get('/getconversation/:receiverId', authMiddleware, userOnly, getConversation);
 
 module.exports = router;

@@ -3,9 +3,9 @@ const express = require('express');
 const router = express.Router();
 
 const {
-    Addfavorite,
-    Getmyfavorites,
-    Deletefavorite
+    addFavorite,
+    getFavorites,
+    removeFavorite
 } = require('../controller/favoriteController');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -16,11 +16,17 @@ const userOnly = (req, res, next) => {
             message: 'User account access required'
         });
     }
+
     next();
 };
 
-router.post('/addfavorite', authMiddleware, userOnly, Addfavorite);
-router.get('/getmyfavorites', authMiddleware, userOnly, Getmyfavorites);
-router.delete('/deletefavorite/:id', authMiddleware, userOnly, Deletefavorite);
+// ADD FAVORITE
+router.post('/addfavorite/:propertyId', authMiddleware, userOnly, addFavorite);
+
+// GET MY FAVORITES
+router.get('/getmyfavorites', authMiddleware, userOnly, getFavorites);
+
+// DELETE FAVORITE
+router.delete('/deletefavorite/:propertyId', authMiddleware, userOnly, removeFavorite);
 
 module.exports = router;

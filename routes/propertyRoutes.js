@@ -3,16 +3,18 @@ const express = require('express');
 const router = express.Router();
 
 const {
-    Addproperty,
-    Getallproperties,
-    Get1property,
-    Updateproperty,
-    Deleteproperty,
-    Addpropertyimage
+    getProperties,
+    getProperty,
+    addProperty,
+    updateProperty,
+    deleteProperty,
+    addPropertyImage
 } = require('../controller/propertycontroller');
 
 const authMiddleware = require('../middleware/authMiddleware');
 
+
+// LANDLORD ONLY
 const landlordOnly = (req, res, next) => {
     if (
         !req.user ||
@@ -23,21 +25,43 @@ const landlordOnly = (req, res, next) => {
             message: 'Landlord access required'
         });
     }
+
     next();
 };
 
-const authenticated = (req, res, next) => {
-    authMiddleware(req, res, next);
-};
 
-// PUBLIC
-router.get('/getallproperties', Getallproperties);
-router.get('/getproperty/:id', Get1property);
+// PUBLIC ROUTES
+router.get('/getallproperties', getProperties);
+router.get('/getproperty/:id', getProperty);
 
-// LANDLORD ONLY
-router.post('/addproperty', authenticated, landlordOnly, Addproperty);
-router.put('/updateproperty/:id', authenticated, landlordOnly, Updateproperty);
-router.delete('/deleteproperty/:id', authenticated, landlordOnly, Deleteproperty);
-router.post('/addpropertyimage', authenticated, landlordOnly, Addpropertyimage);
+
+// LANDLORD ROUTE
+router.post(
+    '/addproperty',
+    authMiddleware,
+    landlordOnly,
+    addProperty
+);
+
+
+// AUTHENTICATED ROUTES
+router.put(
+    '/updateproperty/:id',
+    authMiddleware,
+    updateProperty
+);
+
+router.delete(
+    '/deleteproperty/:id',
+    authMiddleware,
+    deleteProperty
+);
+
+router.post(
+    '/addpropertyimage/:id',
+    authMiddleware,
+    addPropertyImage
+);
+
 
 module.exports = router;

@@ -3,8 +3,8 @@ const express = require('express');
 const router = express.Router();
 
 const {
-    Getalllocations,
-    Addlocation
+    getLocations,
+    addLocation
 } = require('../controller/locationcontroller');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -19,13 +19,14 @@ const adminOnly = (req, res, next) => {
             message: 'Administrator access required'
         });
     }
+
     next();
 };
 
 // PUBLIC
-router.get('/getalllocations', Getalllocations);
+router.get('/getalllocations', getLocations);
 
 // ADMIN ONLY
-router.post('/addlocation', authMiddleware, adminOnly, Addlocation);
+router.post('/addlocation', authMiddleware, adminOnly, addLocation);
 
 module.exports = router;

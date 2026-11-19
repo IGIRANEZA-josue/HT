@@ -3,8 +3,8 @@ const express = require('express');
 const router = express.Router();
 
 const {
-    Getmynotifications,
-    Marknotificationread
+    getNotifications,
+    markNotificationRead
 } = require('../controller/notificationController');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -15,10 +15,14 @@ const userOnly = (req, res, next) => {
             message: 'User account access required'
         });
     }
+
     next();
 };
 
-router.get('/getmynotifications', authMiddleware, userOnly, Getmynotifications);
-router.put('/marknotificationread/:id', authMiddleware, userOnly, Marknotificationread);
+// GET MY NOTIFICATIONS
+router.get('/getmynotifications', authMiddleware, userOnly, getNotifications);
+
+// MARK NOTIFICATION AS READ
+router.put('/marknotificationread/:id', authMiddleware, userOnly, markNotificationRead);
 
 module.exports = router;

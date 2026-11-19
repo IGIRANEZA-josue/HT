@@ -18,7 +18,8 @@ exports.addProperty = async (req,res) => {
 };
 exports.updateProperty = async (req,res) => {
  try {
-  const [p]=await db.query('SELECT landlord_id FROM properties WHERE id=?',[req.params.id]); if(!p.length)return res.status(404).json({message:'Property not found'});
+  const [p]=await db.query('SELECT landlord_id FROM properties WHERE id=?',[req.params.id]); 
+  if(!p.length)return res.status(404).json({message:'Property not found'});
   const owner=req.user?.accountType==='user' && Number(req.user.id)===Number(p[0].landlord_id);
   if(!owner && req.user?.accountType!=='admin')return res.status(403).json({message:'Not allowed'});
   const {location_id,title,description,property_type,bedrooms,bathrooms,monthly_rent,status}=req.body;

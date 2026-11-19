@@ -3,8 +3,8 @@ const express = require('express');
 const router = express.Router();
 
 const {
-    Addappointment,
-    Getmyappointments
+    createAppointment,
+    getMyAppointments
 } = require('../controller/appointmentController');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -15,10 +15,14 @@ const userOnly = (req, res, next) => {
             message: 'User account access required'
         });
     }
+
     next();
 };
 
-router.post('/addappointment', authMiddleware, userOnly, Addappointment);
-router.get('/getmyappointments', authMiddleware, userOnly, Getmyappointments);
+// ADD APPOINTMENT
+router.post('/addappointment', authMiddleware, userOnly, createAppointment);
+
+// GET MY APPOINTMENTS
+router.get('/getmyappointments', authMiddleware, userOnly, getMyAppointments);
 
 module.exports = router;
