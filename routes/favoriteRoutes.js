@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -8,25 +7,34 @@ const {
     removeFavorite
 } = require('../controller/favoriteController');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
+const accountTypeMiddleware = require('../middleware/accountTypeMiddleware');
 
-const userOnly = (req, res, next) => {
-    if (!req.user || req.user.accountType !== 'user') {
-        return res.status(403).json({
-            message: 'User account access required'
-        });
-    }
-
-    next();
-};
+// NORMAL USER ACCESS
+const userAccess = [
+    authMiddleware,
+    accountTypeMiddleware('user')
+];
 
 // ADD FAVORITE
-router.post('/addfavorite/:propertyId', authMiddleware, userOnly, addFavorite);
+router.post(
+    '/addfavorite/:propertyId',
+    ...userAccess,
+    addFavorite
+);
 
 // GET MY FAVORITES
-router.get('/getmyfavorites', authMiddleware, userOnly, getFavorites);
+router.get(
+    '/getmyfavorites',
+    ...userAccess,
+    getFavorites
+);
 
 // DELETE FAVORITE
-router.delete('/deletefavorite/:propertyId', authMiddleware, userOnly, removeFavorite);
+router.delete(
+    '/deletefavorite/:propertyId',
+    ...userAccess,
+    removeFavorite
+);
 
 module.exports = router;

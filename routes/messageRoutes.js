@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -7,22 +6,27 @@ const {
     getConversation
 } = require('../controller/messageController');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
+const accountTypeMiddleware = require('../middleware/accountTypeMiddleware');
 
-const userOnly = (req, res, next) => {
-    if (!req.user || req.user.accountType !== 'user') {
-        return res.status(403).json({
-            message: 'User account access required'
-        });
-    }
-
-    next();
-};
+// NORMAL USER ACCESS
+const userAccess = [
+    authMiddleware,
+    accountTypeMiddleware('user')
+];
 
 // SEND MESSAGE
-router.post('/sendmessage', authMiddleware, userOnly, sendMessage);
+router.post(
+    '/sendmessage',
+    ...userAccess,
+    sendMessage
+);
 
 // GET CONVERSATION
-router.get('/getconversation/:receiverId', authMiddleware, userOnly, getConversation);
+router.get(
+    '/getconversation/:receiverId',
+    ...userAccess,
+    getConversation
+);
 
 module.exports = router;

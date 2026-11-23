@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -11,30 +10,29 @@ const {
     Deleteadmin
 } = require('../controller/admincontroller');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
+const accountTypeMiddleware = require('../middleware/accountTypeMiddleware');
+const roleMiddleware = require('../middleware/roleMiddleware');
 
-const adminOnly = (req, res, next) => {
-    if (
-        !req.user ||
-        req.user.accountType !== 'admin' ||
-        req.user.role !== 'admin'
-    ) {
-        return res.status(403).json({
-            message: 'Administrator access required'
-        });
-    }
+// ADMIN ACCESS
+const adminAccess = [
+    authMiddleware,
+    accountTypeMiddleware('admin'),
+    roleMiddleware('admin')
+];
 
-    next();
-};
-
-// PUBLIC
+// PUBLIC ROUTE
 router.post('/loginadmin', Loginadmin);
 
-// ADMIN ONLY
-router.post('/addadmin', authMiddleware, adminOnly, Addadmin);
-router.get('/getmyadmin', authMiddleware, adminOnly, Getmyadmin);
-router.get('/getalladmins', authMiddleware, adminOnly, Getalladmins);
-router.get('/getadmin/:id', authMiddleware, adminOnly, Get1admin);
-router.delete('/deleteadmin/:id', authMiddleware, adminOnly, Deleteadmin);
+// ADMIN ONLY ROUTES
+router.post('/addadmin', ...adminAccess, Addadmin);
+
+router.get('/getmyadmin', ...adminAccess, Getmyadmin);
+
+router.get('/getalladmins', ...adminAccess, Getalladmins);
+
+router.get('/getadmin/:id', ...adminAccess, Get1admin);
+
+router.delete('/deleteadmin/:id', ...adminAccess, Deleteadmin);
 
 module.exports = router;

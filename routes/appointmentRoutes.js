@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -7,22 +6,29 @@ const {
     getMyAppointments
 } = require('../controller/appointmentController');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
+const accountTypeMiddleware = require('../middleware/accountTypeMiddleware');
+const roleMiddleware = require('../middleware/roleMiddleware');
 
-const userOnly = (req, res, next) => {
-    if (!req.user || req.user.accountType !== 'user') {
-        return res.status(403).json({
-            message: 'User account access required'
-        });
-    }
+// NORMAL USER ACCESS
+const userAccess = [
+    authMiddleware,
+    accountTypeMiddleware('user')
+];
 
-    next();
-};
+// SEEKER ONLY: CREATE APPOINTMENT
+router.post(
+    '/addappointment',
+    ...userAccess,
+    roleMiddleware('seeker'),
+    createAppointment
+);
 
-// ADD APPOINTMENT
-router.post('/addappointment', authMiddleware, userOnly, createAppointment);
-
-// GET MY APPOINTMENTS
-router.get('/getmyappointments', authMiddleware, userOnly, getMyAppointments);
+// SEEKERS AND LANDLORDS: VIEW APPOINTMENTS
+router.get(
+    '/getmyappointments',
+    ...userAccess,
+    getMyAppointments
+);
 
 module.exports = router;

@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -7,25 +6,29 @@ const {
     getMyRentalRequests
 } = require('../controller/rentalRequestController');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
+const accountTypeMiddleware = require('../middleware/accountTypeMiddleware');
+const roleMiddleware = require('../middleware/roleMiddleware');
 
-const seekerOnly = (req, res, next) => {
-    if (
-        !req.user ||
-        req.user.accountType !== 'user' ||
-        req.user.role !== 'seeker'
-    ) {
-        return res.status(403).json({
-            message: 'Seeker access required'
-        });
-    }
+// NORMAL USER ACCESS
+const userAccess = [
+    authMiddleware,
+    accountTypeMiddleware('user')
+];
 
-    next();
-};
+// SEEKER ONLY: CREATE RENTAL REQUEST
+router.post(
+    '/addrentalrequest',
+    ...userAccess,
+    roleMiddleware('seeker'),
+    createRentalRequest
+);
 
-// SEEKER ONLY
-router.post('/addrentalrequest', authMiddleware, seekerOnly, createRentalRequest);
-
-router.get('/getmyrentalrequests', authMiddleware, seekerOnly, getMyRentalRequests);
+// SEEKERS AND LANDLORDS: VIEW RENTAL REQUESTS
+router.get(
+    '/getmyrentalrequests',
+    ...userAccess,
+    getMyRentalRequests
+);
 
 module.exports = router;

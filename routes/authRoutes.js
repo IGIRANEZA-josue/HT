@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -12,51 +11,38 @@ const {
     Deleteuser
 } = require('../controller/usercontroller');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
+const accountTypeMiddleware = require('../middleware/accountTypeMiddleware');
+const roleMiddleware = require('../middleware/roleMiddleware');
 
+// NORMAL USER ACCESS
+const userAccess = [
+    authMiddleware,
+    accountTypeMiddleware('user')
+];
 
-// USER ONLY
-const userOnly = (req, res, next) => {
-    if (!req.user || req.user.accountType !== 'user') {
-        return res.status(403).json({
-            message: 'User account access required'
-        });
-    }
-
-    next();
-};
-
-
-// ADMIN ONLY
-const adminOnly = (req, res, next) => {
-    if (
-        !req.user ||
-        req.user.accountType !== 'admin' ||
-        req.user.role !== 'admin'
-    ) {
-        return res.status(403).json({
-            message: 'Administrator access required'
-        });
-    }
-
-    next();
-};
-
+// ADMIN ACCESS
+const adminAccess = [
+    authMiddleware,
+    accountTypeMiddleware('admin'),
+    roleMiddleware('admin')
+];
 
 // PUBLIC ROUTES
 router.post('/registeruser', Adduser);
+
 router.post('/loginuser', Loginuser);
 
+// NORMAL USER ROUTES
+router.get('/getmyprofile', ...userAccess, Getmyprofile);
 
-// USER ROUTES
-router.get('/getmyprofile', authMiddleware, userOnly, Getmyprofile);
-router.put('/updateuser', authMiddleware, userOnly, Updateuser);
-router.delete('/deleteuser', authMiddleware, userOnly, Deleteuser);
+router.put('/updateuser', ...userAccess, Updateuser);
 
+router.delete('/deleteuser', ...userAccess, Deleteuser);
 
 // ADMIN USER MANAGEMENT ROUTES
-router.get('/getallusers', authMiddleware, adminOnly, Getallusers);
-router.get('/getuser/:id', authMiddleware, adminOnly, Get1user);
+router.get('/getallusers', ...adminAccess, Getallusers);
 
+router.get('/getuser/:id', ...adminAccess, Get1user);
 
 module.exports = router;

@@ -4,6 +4,213 @@ const bcrypt = require('bcrypt');
 const generateToken = require('../utils/generatetoken');
 
 
+// REUSABLE FUNCTION: GET USER WITH ALL RELATED INFORMATION
+const getUserWithRelations = async (userId, existingUser = null) => {
+
+    // Get user information
+    let user = existingUser;
+
+    if (!user) {
+        const [users] = await db.query(
+            `SELECT id, name, usern, email, role, department
+             FROM htracker
+             WHERE id = ?`,
+            [userId]
+        );
+
+        if (users.length === 0) {
+            return null;
+        }
+
+        user = users[0];
+    }
+
+    // Get all related information
+    const [
+        propertiesResult,
+        favoritesResult,
+        sentMessagesResult,
+        receivedMessagesResult,
+        notificationsResult,
+        submittedRequestsResult,
+        receivedRequestsResult,
+        appointmentsResult
+    ] = await Promise.all([
+
+        // 1. Properties owned by user
+        db.query(
+            `SELECT
+                p.*,
+                l.province,
+                l.district,
+                l.sector,
+                l.cell_name,
+                l.village,
+                l.strreet_address
+             FROM properties p
+             LEFT JOIN location l ON p.location_id = l.id
+             WHERE p.landlord_id = ?`,
+            [userId]
+        ),
+
+        // 2. Favorite properties
+        db.query(
+            `SELECT
+                f.id AS favorite_id,
+                f.created_at AS favorited_at,
+                p.id AS property_id,
+                p.title,
+                p.description,
+                p.monthly_rent,
+                p.status,
+                p.property_type,
+                p.landlord_id
+             FROM favorites f
+             JOIN properties p ON f.property_id = p.id
+             WHERE f.user_id = ?`,
+            [userId]
+        ),
+
+        // 3. Messages sent by user
+        db.query(
+            `SELECT
+                m.*,
+                receiver.name AS receiver_name,
+                p.title AS property_title
+             FROM messages m
+             JOIN htracker receiver ON m.receiver_id = receiver.id
+             LEFT JOIN properties p ON m.property_id = p.id
+             WHERE m.sender_id = ?
+             ORDER BY m.sent_at DESC`,
+            [userId]
+        ),
+
+        // 4. Messages received by user
+        db.query(
+            `SELECT
+                m.*,
+                sender.name AS sender_name,
+                p.title AS property_title
+             FROM messages m
+             JOIN htracker sender ON m.sender_id = sender.id
+             LEFT JOIN properties p ON m.property_id = p.id
+             WHERE m.receiver_id = ?
+             ORDER BY m.sent_at DESC`,
+            [userId]
+        ),
+
+        // 5. Notifications
+        db.query(
+            `SELECT *
+             FROM notifications
+             WHERE user_id = ?
+             ORDER BY created_at DESC`,
+            [userId]
+        ),
+
+        // 6. Rental requests submitted by user
+        db.query(
+            `SELECT
+                rr.*,
+                p.title AS property_title,
+                p.monthly_rent,
+                landlord.name AS landlord_name
+             FROM rental_requests rr
+             JOIN properties p ON rr.property_id = p.id
+             JOIN htracker landlord ON p.landlord_id = landlord.id
+             WHERE rr.seeker_id = ?
+             ORDER BY rr.created_at DESC`,
+            [userId]
+        ),
+
+        // 7. Rental requests received by user as landlord
+        db.query(
+            `SELECT
+                rr.*,
+                p.title AS property_title,
+                seeker.name AS seeker_name
+             FROM rental_requests rr
+             JOIN properties p ON rr.property_id = p.id
+             JOIN htracker seeker ON rr.seeker_id = seeker.id
+             WHERE p.landlord_id = ?
+             ORDER BY rr.created_at DESC`,
+            [userId]
+        ),
+
+        // 8. Viewing appointments (as seeker or landlord)
+        db.query(
+            `SELECT
+                a.*,
+                p.title AS property_title,
+                seeker.name AS seeker_name,
+                landlord.name AS landlord_name,
+                CASE
+                    WHEN a.seeker_id = ? THEN 'seeker'
+                    ELSE 'landlord'
+                END AS my_role
+             FROM viewing_appointments a
+             JOIN properties p ON a.property_id = p.id
+             JOIN htracker seeker ON a.seeker_id = seeker.id
+             JOIN htracker landlord ON a.landlord_id = landlord.id
+             WHERE a.seeker_id = ? OR a.landlord_id = ?
+             ORDER BY a.appointment_date DESC`,
+            [userId, userId, userId]
+        )
+    ]);
+
+    const properties = propertiesResult[0];
+    const favorites = favoritesResult[0];
+    const sentMessages = sentMessagesResult[0];
+    const receivedMessages = receivedMessagesResult[0];
+    const notifications = notificationsResult[0];
+    const submittedRequests = submittedRequestsResult[0];
+    const receivedRequests = receivedRequestsResult[0];
+    const appointments = appointmentsResult[0];
+
+    // Get images belonging to the user's properties
+    if (properties.length > 0) {
+        const propertyIds = properties.map(property => property.id);
+
+        const [images] = await db.query(
+            `SELECT property_id, image_url
+             FROM property_images
+             WHERE property_id IN (?)`,
+            [propertyIds]
+        );
+
+        // Attach images to their respective properties
+        properties.forEach(property => {
+            property.images = images
+                .filter(image => image.property_id === property.id)
+                .map(image => image.image_url);
+        });
+    }
+
+    // Return complete user information
+    return {
+        ...user,
+
+        properties,
+
+        favorites,
+
+        messages: {
+            sent: sentMessages,
+            received: receivedMessages
+        },
+
+        notifications,
+
+        rental_requests: {
+            submitted: submittedRequests,
+            received: receivedRequests
+        },
+
+        appointments
+    };
+};
+
+
 // REGISTER USER
 const Adduser = async (req, res) => {
     try {
@@ -27,7 +234,6 @@ const Adduser = async (req, res) => {
             });
         }
 
-        // Only seekers and landlords can register
         const userRole = role || 'seeker';
 
         if (!['seeker', 'landlord'].includes(userRole)) {
@@ -36,7 +242,6 @@ const Adduser = async (req, res) => {
             });
         }
 
-        // Check duplicate username and email
         const [existing] = await db.query(
             'SELECT id FROM htracker WHERE usern = ? OR email = ?',
             [username, email]
@@ -48,11 +253,9 @@ const Adduser = async (req, res) => {
             });
         }
 
-        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Insert user
-        await db.query(
+        const [result] = await db.query(
             `INSERT INTO htracker
             (name, usern, email, pass, role, department)
             VALUES (?, ?, ?, ?, ?, ?)`,
@@ -67,7 +270,8 @@ const Adduser = async (req, res) => {
         );
 
         return res.status(201).json({
-            message: 'Registration successful'
+            message: 'Registration successful',
+            userId: result.insertId
         });
 
     } catch (error) {
@@ -104,7 +308,6 @@ const Loginuser = async (req, res) => {
 
         const user = users[0];
 
-        // Compare password with hashed password
         const passwordMatch = await bcrypt.compare(
             password,
             user.pass
@@ -116,7 +319,6 @@ const Loginuser = async (req, res) => {
             });
         }
 
-        // Generate JWT
         const token = generateToken(
             user.id,
             user.role,
@@ -125,7 +327,7 @@ const Loginuser = async (req, res) => {
 
         return res.status(200).json({
             message: 'Login successful',
-            token: token
+            token
         });
 
     } catch (error) {
@@ -138,17 +340,12 @@ const Loginuser = async (req, res) => {
 };
 
 
-// GET MY PROFILE
+// GET MY PROFILE WITH ALL RELATED INFORMATION
 const Getmyprofile = async (req, res) => {
     try {
-        const [users] = await db.query(
-            `SELECT id, name, usern, email, role, department
-             FROM htracker
-             WHERE id = ?`,
-            [req.user.id]
-        );
+        const user = await getUserWithRelations(req.user.id);
 
-        if (users.length === 0) {
+        if (!user) {
             return res.status(404).json({
                 message: 'User not found'
             });
@@ -156,7 +353,7 @@ const Getmyprofile = async (req, res) => {
 
         return res.status(200).json({
             message: 'Profile retrieved successfully',
-            user: users[0]
+            user
         });
 
     } catch (error) {
@@ -219,17 +416,25 @@ const Updateuser = async (req, res) => {
 };
 
 
-// GET ALL USERS (ADMIN ONLY)
+// GET ALL USERS WITH ALL RELATED INFORMATION (ADMIN ONLY)
 const Getallusers = async (req, res) => {
     try {
         const [users] = await db.query(
             `SELECT id, name, usern, email, role, department
-             FROM htracker`
+             FROM htracker
+             ORDER BY id DESC`
+        );
+
+        const completeUsers = await Promise.all(
+            users.map(user =>
+                getUserWithRelations(user.id, user)
+            )
         );
 
         return res.status(200).json({
-            message: 'Users retrieved successfully',
-            users
+            message: 'Users and their related information retrieved successfully',
+            totalUsers: completeUsers.length,
+            users: completeUsers
         });
 
     } catch (error) {
@@ -242,7 +447,7 @@ const Getallusers = async (req, res) => {
 };
 
 
-// GET ONE USER (ADMIN ONLY)
+// GET ONE USER WITH ALL RELATED INFORMATION (ADMIN ONLY)
 const Get1user = async (req, res) => {
     try {
         const userId = Number(req.params.id);
@@ -253,22 +458,17 @@ const Get1user = async (req, res) => {
             });
         }
 
-        const [users] = await db.query(
-            `SELECT id, name, usern, email, role, department
-             FROM htracker
-             WHERE id = ?`,
-            [userId]
-        );
+        const user = await getUserWithRelations(userId);
 
-        if (users.length === 0) {
+        if (!user) {
             return res.status(404).json({
                 message: 'User not found'
             });
         }
 
         return res.status(200).json({
-            message: 'User retrieved successfully',
-            user: users[0]
+            message: 'User and related information retrieved successfully',
+            user
         });
 
     } catch (error) {

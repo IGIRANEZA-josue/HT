@@ -3,11 +3,16 @@ const db = require('../db/db.js');
 const bcrypt = require('bcrypt');
 const generateToken = require('../utils/generatetoken');
 
+// Check whether the logged-in account is an administrator
+const isAdmin = (req) => req.user?.accountType === 'admin';
 
 // ADD ADMIN
-// Only an authenticated administrator should access this function.
 const Addadmin = async (req, res) => {
     try {
+        if (!isAdmin(req)) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
         const { username, Akey, password, department } = req.body;
 
         if (!username || !Akey || !password) {
@@ -22,10 +27,8 @@ const Addadmin = async (req, res) => {
             });
         }
 
-        // Check duplicate username or admin key
         const [existing] = await db.query(
-            `SELECT id FROM admin
-             WHERE usern = ? OR Akey = ?`,
+            'SELECT id FROM admin WHERE usern = ? OR Akey = ?',
             [username, Akey]
         );
 
@@ -35,35 +38,24 @@ const Addadmin = async (req, res) => {
             });
         }
 
-        // Hash admin password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        await db.query(
-            `INSERT INTO admin
-            (usern, Akey, pass, role, department)
-            VALUES (?, ?, ?, ?, ?)`,
-            [
-                username,
-                Akey,
-                hashedPassword,
-                'admin',
-                department || 'General'
-            ]
+        const [result] = await db.query(
+            `INSERT INTO admin (usern, Akey, pass, role, department)
+             VALUES (?, ?, ?, ?, ?)`,
+            [username, Akey, hashedPassword, 'admin', department || 'General']
         );
 
         return res.status(201).json({
-            message: 'Admin created successfully'
+            message: 'Admin created successfully',
+            adminId: result.insertId
         });
 
     } catch (error) {
-        console.log(error.message);
-
-        return res.status(500).json({
-            message: 'Could not create admin'
-        });
+        console.error(error.message);
+        return res.status(500).json({ message: 'Could not create admin' });
     }
 };
-
 
 // ADMIN LOGIN
 const Loginadmin = async (req, res) => {
@@ -88,12 +80,7 @@ const Loginadmin = async (req, res) => {
         }
 
         const admin = admins[0];
-
-        // Compare password with hashed password
-        const passwordMatch = await bcrypt.compare(
-            password,
-            admin.pass
-        );
+        const passwordMatch = await bcrypt.compare(password, admin.pass);
 
         if (!passwordMatch) {
             return res.status(401).json({
@@ -101,42 +88,34 @@ const Loginadmin = async (req, res) => {
             });
         }
 
-        // Generate admin JWT
-        const token = generateToken(
-            admin.id,
-            'admin',
-            'admin'
-        );
+        const token = generateToken(admin.id, 'admin', 'admin');
 
         return res.status(200).json({
             message: 'Login successful',
-            token: token
+            token
         });
 
     } catch (error) {
-        console.log(error.message);
-
-        return res.status(500).json({
-            message: 'Admin login failed'
-        });
+        console.error(error.message);
+        return res.status(500).json({ message: 'Admin login failed' });
     }
 };
-
 
 // GET MY ADMIN PROFILE
 const Getmyadmin = async (req, res) => {
     try {
+        if (!isAdmin(req)) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
         const [admins] = await db.query(
             `SELECT id, usern, role, department
-             FROM admin
-             WHERE id = ?`,
+             FROM admin WHERE id = ?`,
             [req.user.id]
         );
 
         if (admins.length === 0) {
-            return res.status(404).json({
-                message: 'Admin not found'
-            });
+            return res.status(404).json({ message: 'Admin not found' });
         }
 
         return res.status(200).json({
@@ -145,21 +124,22 @@ const Getmyadmin = async (req, res) => {
         });
 
     } catch (error) {
-        console.log(error.message);
-
+        console.error(error.message);
         return res.status(500).json({
             message: 'Could not retrieve admin profile'
         });
     }
 };
 
-
 // GET ALL ADMINS
 const Getalladmins = async (req, res) => {
     try {
+        if (!isAdmin(req)) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
         const [admins] = await db.query(
-            `SELECT id, usern, role, department
-             FROM admin`
+            'SELECT id, usern, role, department FROM admin'
         );
 
         return res.status(200).json({
@@ -168,37 +148,32 @@ const Getalladmins = async (req, res) => {
         });
 
     } catch (error) {
-        console.log(error.message);
-
-        return res.status(500).json({
-            message: 'Could not retrieve admins'
-        });
+        console.error(error.message);
+        return res.status(500).json({ message: 'Could not retrieve admins' });
     }
 };
-
 
 // GET ONE ADMIN
 const Get1admin = async (req, res) => {
     try {
+        if (!isAdmin(req)) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
         const adminId = Number(req.params.id);
 
         if (!Number.isInteger(adminId) || adminId <= 0) {
-            return res.status(400).json({
-                message: 'Invalid admin ID'
-            });
+            return res.status(400).json({ message: 'Invalid admin ID' });
         }
 
         const [admins] = await db.query(
             `SELECT id, usern, role, department
-             FROM admin
-             WHERE id = ?`,
+             FROM admin WHERE id = ?`,
             [adminId]
         );
 
         if (admins.length === 0) {
-            return res.status(404).json({
-                message: 'Admin not found'
-            });
+            return res.status(404).json({ message: 'Admin not found' });
         }
 
         return res.status(200).json({
@@ -207,57 +182,56 @@ const Get1admin = async (req, res) => {
         });
 
     } catch (error) {
-        console.log(error.message);
-
-        return res.status(500).json({
-            message: 'Could not retrieve admin'
-        });
+        console.error(error.message);
+        return res.status(500).json({ message: 'Could not retrieve admin' });
     }
 };
-
 
 // DELETE ADMIN
 const Deleteadmin = async (req, res) => {
     try {
+        if (!isAdmin(req)) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
         const adminId = Number(req.params.id);
 
         if (!Number.isInteger(adminId) || adminId <= 0) {
-            return res.status(400).json({
-                message: 'Invalid admin ID'
-            });
+            return res.status(400).json({ message: 'Invalid admin ID' });
         }
 
-        // Prevent administrator from deleting their own account
         if (adminId === Number(req.user.id)) {
             return res.status(400).json({
                 message: 'You cannot delete your own admin account'
             });
         }
 
-        const [result] = await db.query(
-            'DELETE FROM admin WHERE id = ?',
+        const [admins] = await db.query(
+            'SELECT id FROM admin WHERE id = ?',
             [adminId]
         );
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message: 'Admin not found'
+        if (admins.length === 0) {
+            return res.status(404).json({ message: 'Admin not found' });
+        }
+
+        const [count] = await db.query('SELECT COUNT(*) AS total FROM admin');
+
+        if (Number(count[0].total) <= 1) {
+            return res.status(400).json({
+                message: 'You cannot delete the last administrator'
             });
         }
 
-        return res.status(200).json({
-            message: 'Admin deleted successfully'
-        });
+        await db.query('DELETE FROM admin WHERE id = ?', [adminId]);
+
+        return res.status(200).json({ message: 'Admin deleted successfully' });
 
     } catch (error) {
-        console.log(error.message);
-
-        return res.status(500).json({
-            message: 'Could not delete admin'
-        });
+        console.error(error.message);
+        return res.status(500).json({ message: 'Could not delete admin' });
     }
 };
-
 
 module.exports = {
     Addadmin,

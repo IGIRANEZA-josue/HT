@@ -1,32 +1,30 @@
-
 const express = require('express');
 const router = express.Router();
 
 const {
     getLocations,
     addLocation
-} = require('../controller/locationcontroller');
+} = require('../controller/locationController');
 
-const authMiddleware = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authmiddleware');
+const accountTypeMiddleware = require('../middleware/accountTypeMiddleware');
+const roleMiddleware = require('../middleware/roleMiddleware');
 
-const adminOnly = (req, res, next) => {
-    if (
-        !req.user ||
-        req.user.accountType !== 'admin' ||
-        req.user.role !== 'admin'
-    ) {
-        return res.status(403).json({
-            message: 'Administrator access required'
-        });
-    }
+// ADMIN ACCESS
+const adminAccess = [
+    authMiddleware,
+    accountTypeMiddleware('admin'),
+    roleMiddleware('admin')
+];
 
-    next();
-};
-
-// PUBLIC
+// PUBLIC ROUTE
 router.get('/getalllocations', getLocations);
 
 // ADMIN ONLY
-router.post('/addlocation', authMiddleware, adminOnly, addLocation);
+router.post(
+    '/addlocation',
+    ...adminAccess,
+    addLocation
+);
 
 module.exports = router;
