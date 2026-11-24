@@ -7,7 +7,7 @@ const generateToken = require('../utils/generatetoken');
 // REUSABLE FUNCTION: GET USER WITH ALL RELATED INFORMATION
 const getUserWithRelations = async (userId, existingUser = null) => {
 
-    // Get user information
+    // GET USER INFORMATION
     let user = existingUser;
 
     if (!user) {
@@ -25,7 +25,7 @@ const getUserWithRelations = async (userId, existingUser = null) => {
         user = users[0];
     }
 
-    // Get all related information
+    // GET ALL RELATED INFORMATION
     const [
         propertiesResult,
         favoritesResult,
@@ -37,7 +37,7 @@ const getUserWithRelations = async (userId, existingUser = null) => {
         appointmentsResult
     ] = await Promise.all([
 
-        // 1. Properties owned by user
+        // 1. PROPERTIES OWNED BY USER
         db.query(
             `SELECT
                 p.*,
@@ -53,7 +53,7 @@ const getUserWithRelations = async (userId, existingUser = null) => {
             [userId]
         ),
 
-        // 2. Favorite properties
+        // 2. FAVORITE PROPERTIES
         db.query(
             `SELECT
                 f.id AS favorite_id,
@@ -71,7 +71,7 @@ const getUserWithRelations = async (userId, existingUser = null) => {
             [userId]
         ),
 
-        // 3. Messages sent by user
+        // 3. MESSAGES SENT BY USER
         db.query(
             `SELECT
                 m.*,
@@ -85,7 +85,7 @@ const getUserWithRelations = async (userId, existingUser = null) => {
             [userId]
         ),
 
-        // 4. Messages received by user
+        // 4. MESSAGES RECEIVED BY USER
         db.query(
             `SELECT
                 m.*,
@@ -99,7 +99,7 @@ const getUserWithRelations = async (userId, existingUser = null) => {
             [userId]
         ),
 
-        // 5. Notifications
+        // 5. NOTIFICATIONS
         db.query(
             `SELECT *
              FROM notifications
@@ -108,7 +108,7 @@ const getUserWithRelations = async (userId, existingUser = null) => {
             [userId]
         ),
 
-        // 6. Rental requests submitted by user
+        // 6. RENTAL REQUESTS SUBMITTED BY USER
         db.query(
             `SELECT
                 rr.*,
@@ -123,11 +123,12 @@ const getUserWithRelations = async (userId, existingUser = null) => {
             [userId]
         ),
 
-        // 7. Rental requests received by user as landlord
+        // 7. RENTAL REQUESTS RECEIVED BY USER AS LANDLORD
         db.query(
             `SELECT
                 rr.*,
                 p.title AS property_title,
+                p.monthly_rent,
                 seeker.name AS seeker_name
              FROM rental_requests rr
              JOIN properties p ON rr.property_id = p.id
@@ -137,7 +138,7 @@ const getUserWithRelations = async (userId, existingUser = null) => {
             [userId]
         ),
 
-        // 8. Viewing appointments (as seeker or landlord)
+        // 8. VIEWING APPOINTMENTS
         db.query(
             `SELECT
                 a.*,
@@ -167,26 +168,47 @@ const getUserWithRelations = async (userId, existingUser = null) => {
     const receivedRequests = receivedRequestsResult[0];
     const appointments = appointmentsResult[0];
 
-    // Get images belonging to the user's properties
-    if (properties.length > 0) {
-        const propertyIds = properties.map(property => property.id);
 
-        const [images] = await db.query(
+    // 9. GET IMAGES FOR OWNED AND FAVORITE PROPERTIES
+
+    const propertyIds = [
+        ...properties.map(property => property.id),
+        ...favorites.map(favorite => favorite.property_id)
+    ];
+
+    let images = [];
+
+    if (propertyIds.length > 0) {
+        const [imageResults] = await db.query(
             `SELECT property_id, image_url
              FROM property_images
              WHERE property_id IN (?)`,
             [propertyIds]
         );
 
-        // Attach images to their respective properties
-        properties.forEach(property => {
-            property.images = images
-                .filter(image => image.property_id === property.id)
-                .map(image => image.image_url);
-        });
+        images = imageResults;
     }
 
-    // Return complete user information
+    // ATTACH IMAGES TO OWNED PROPERTIES
+    properties.forEach(property => {
+        property.images = images
+            .filter(image =>
+                String(image.property_id) === String(property.id)
+            )
+            .map(image => image.image_url);
+    });
+
+    // ATTACH IMAGES TO FAVORITE PROPERTIES
+    favorites.forEach(favorite => {
+        favorite.images = images
+            .filter(image =>
+                String(image.property_id) === String(favorite.property_id)
+            )
+            .map(image => image.image_url);
+    });
+
+
+    // RETURN COMPLETE USER INFORMATION
     return {
         ...user,
 
@@ -222,13 +244,17 @@ const Adduser = async (req, res) => {
             });
         }
 
-        if (!email.includes('@') || !email.includes('.')) {
+        if (
+            typeof email !== 'string' ||
+            !email.includes('@') ||
+            !email.includes('.')
+        ) {
             return res.status(400).json({
                 message: 'Invalid email address'
             });
         }
 
-        if (password.length < 8) {
+        if (typeof password !== 'string' || password.length < 8) {
             return res.status(400).json({
                 message: 'Password must contain at least 8 characters'
             });
@@ -340,7 +366,7 @@ const Loginuser = async (req, res) => {
 };
 
 
-// GET MY PROFILE WITH ALL RELATED INFORMATION
+// GET MY COMPLETE PROFILE
 const Getmyprofile = async (req, res) => {
     try {
         const user = await getUserWithRelations(req.user.id);
@@ -352,7 +378,7 @@ const Getmyprofile = async (req, res) => {
         }
 
         return res.status(200).json({
-            message: 'Profile retrieved successfully',
+            message: 'Complete profile retrieved successfully',
             user
         });
 
@@ -360,7 +386,7 @@ const Getmyprofile = async (req, res) => {
         console.log(error.message);
 
         return res.status(500).json({
-            message: 'Could not retrieve profile'
+            message: 'Could not retrieve complete profile'
         });
     }
 };
@@ -377,7 +403,11 @@ const Updateuser = async (req, res) => {
             });
         }
 
-        if (!email.includes('@') || !email.includes('.')) {
+        if (
+            typeof email !== 'string' ||
+            !email.includes('@') ||
+            !email.includes('.')
+        ) {
             return res.status(400).json({
                 message: 'Invalid email address'
             });
@@ -416,7 +446,7 @@ const Updateuser = async (req, res) => {
 };
 
 
-// GET ALL USERS WITH ALL RELATED INFORMATION (ADMIN ONLY)
+// GET ALL USERS WITH RELATED INFORMATION (ADMIN ONLY)
 const Getallusers = async (req, res) => {
     try {
         const [users] = await db.query(
@@ -447,7 +477,7 @@ const Getallusers = async (req, res) => {
 };
 
 
-// GET ONE USER WITH ALL RELATED INFORMATION (ADMIN ONLY)
+// GET ONE USER WITH RELATED INFORMATION (ADMIN ONLY)
 const Get1user = async (req, res) => {
     try {
         const userId = Number(req.params.id);
@@ -509,6 +539,7 @@ const Deleteuser = async (req, res) => {
 };
 
 
+// EXPORT CONTROLLER FUNCTIONS
 module.exports = {
     Adduser,
     Loginuser,
