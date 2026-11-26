@@ -1,10 +1,45 @@
 
 const db = require('../db/db.js');
 
+// VALIDATE DATE FORMAT: YYYY-MM-DD
+const isValidDate = (date) => {
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return false;
+    }
+
+    const parsedDate = new Date(`${date}T00:00:00.000Z`);
+
+    return !Number.isNaN(parsedDate.getTime()) &&
+        parsedDate.toISOString().slice(0, 10) === date;
+};
+
+
+// GET TODAY'S DATE USING RWANDA TIME
+const getToday = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Africa/Kigali',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(new Date());
+
+    const dateParts = {};
+
+    parts.forEach(part => {
+        dateParts[part.type] = part.value;
+    });
+
+    return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+};
+
 
 // CREATE RENTAL REQUEST
 exports.createRentalRequest = async (req, res) => {
+    let connection;
+    let transactionStarted = false;
+
     try {
+        // Only seekers can send rental requests
         if (
             req.user?.accountType !== 'user' ||
             req.user?.role !== 'seeker'
@@ -19,17 +54,11 @@ exports.createRentalRequest = async (req, res) => {
             message,
             rental_start_date,
             rental_end_date
-        } = req.body;
+        } = req.body || {};
 
         const propertyId = Number(property_id);
 
         // Validate property ID
-        if (!property_id) {
-            return res.status(400).json({
-                message: 'property_id is required'
-            });
-        }
-
         if (!Number.isInteger(propertyId) || propertyId <= 0) {
             return res.status(400).json({
                 message: 'Invalid property ID'
@@ -37,72 +66,96 @@ exports.createRentalRequest = async (req, res) => {
         }
 
         // Validate rental dates
-        if (!rental_start_date || !rental_end_date) {
-            return res.status(400).json({
-                message: 'Rental start date and end date are required'
-            });
-        }
-
-        // Check date format
-        const startDate = new Date(rental_start_date);
-        const endDate = new Date(rental_end_date);
-
         if (
-            !/^\d{4}-\d{2}-\d{2}$/.test(rental_start_date) ||
-            !/^\d{4}-\d{2}-\d{2}$/.test(rental_end_date) ||
-            Number.isNaN(startDate.getTime()) ||
-            Number.isNaN(endDate.getTime()) ||
-            startDate.toISOString().slice(0, 10) !== rental_start_date ||
-            endDate.toISOString().slice(0, 10) !== rental_end_date
+            !isValidDate(rental_start_date) ||
+            !isValidDate(rental_end_date)
         ) {
             return res.status(400).json({
-                message: 'Please provide valid dates in YYYY-MM-DD format'
+                message: 'Please provide valid rental dates in YYYY-MM-DD format'
             });
         }
 
+        // Rental end date must be after start date
         if (rental_end_date <= rental_start_date) {
             return res.status(400).json({
                 message: 'Rental end date must be after rental start date'
             });
         }
 
-        const today = new Date().toISOString().slice(0, 10);
-
-        if (rental_start_date < today) {
+        // Start date cannot be in the past
+        if (rental_start_date < getToday()) {
             return res.status(400).json({
                 message: 'Rental start date cannot be in the past'
             });
         }
 
-        // Check whether property exists
-        const [properties] = await db.query(
+        connection = await db.getConnection();
+
+        await connection.beginTransaction();
+        transactionStarted = true;
+
+        // Lock the property while processing the request
+        const [properties] = await connection.query(
             `SELECT id, landlord_id, status
              FROM properties
-             WHERE id = ?`,
+             WHERE id = ?
+             FOR UPDATE`,
             [propertyId]
         );
 
         if (properties.length === 0) {
+            await connection.rollback();
+            transactionStarted = false;
+
             return res.status(404).json({
                 message: 'Property not found'
             });
         }
 
-        if (properties[0].status !== 'available') {
+        const property = properties[0];
+
+        // Do not allow requests for rented properties
+        if (property.status !== 'available') {
+            await connection.rollback();
+            transactionStarted = false;
+
             return res.status(400).json({
-                message: 'This property is not available'
+                message: 'This property is no longer available for rental requests'
             });
         }
 
         // Prevent landlord from requesting own property
-        if (Number(properties[0].landlord_id) === Number(req.user.id)) {
+        if (Number(property.landlord_id) === Number(req.user.id)) {
+            await connection.rollback();
+            transactionStarted = false;
+
             return res.status(400).json({
                 message: 'You cannot request your own property'
             });
         }
 
+        // Prevent duplicate pending requests
+        const [existingRequests] = await connection.query(
+            `SELECT id
+             FROM rental_requests
+             WHERE property_id = ?
+             AND seeker_id = ?
+             AND status = 'pending'
+             LIMIT 1`,
+            [propertyId, req.user.id]
+        );
+
+        if (existingRequests.length > 0) {
+            await connection.rollback();
+            transactionStarted = false;
+
+            return res.status(409).json({
+                message: 'You already have a pending request for this property'
+            });
+        }
+
         // Insert rental request
-        const [result] = await db.query(
+        const [result] = await connection.query(
             `INSERT INTO rental_requests
              (
                 property_id,
@@ -121,6 +174,9 @@ exports.createRentalRequest = async (req, res) => {
             ]
         );
 
+        await connection.commit();
+        transactionStarted = false;
+
         return res.status(201).json({
             message: 'Rental request sent successfully',
             requestId: result.insertId,
@@ -131,11 +187,20 @@ exports.createRentalRequest = async (req, res) => {
         });
 
     } catch (error) {
+        if (connection && transactionStarted) {
+            await connection.rollback();
+        }
+
         console.error('CREATE RENTAL REQUEST ERROR:', error);
 
         return res.status(500).json({
             message: 'Could not create rental request'
         });
+
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
 };
 
@@ -144,7 +209,6 @@ exports.createRentalRequest = async (req, res) => {
 // Returns submitted requests and requests received by landlords.
 exports.getMyRentalRequests = async (req, res) => {
     try {
-
         // Requests submitted by the logged-in seeker
         const [submitted] = await db.query(
             `SELECT
@@ -194,12 +258,23 @@ exports.getMyRentalRequests = async (req, res) => {
 
 // APPROVE OR REJECT RENTAL REQUEST
 exports.updateRentalRequestStatus = async (req, res) => {
-
-    const connection = await db.getConnection();
+    let connection;
+    let transactionStarted = false;
 
     try {
+        // Only landlords can approve or reject requests
+        if (
+            req.user?.accountType !== 'user' ||
+            req.user?.role !== 'landlord'
+        ) {
+            return res.status(403).json({
+                message: 'Only landlords can update rental requests'
+            });
+        }
+
         const requestId = Number(req.params.id);
-        const { status } = req.body;
+        const { status } = req.body || {};
+
         const landlordId = req.user.id;
 
         // Validate request ID
@@ -216,27 +291,74 @@ exports.updateRentalRequestStatus = async (req, res) => {
             });
         }
 
-        await connection.beginTransaction();
+        connection = await db.getConnection();
 
-        // Lock property and retrieve request information
+        await connection.beginTransaction();
+        transactionStarted = true;
+
+        // First find the property connected to this request
+        const [requestInfo] = await connection.query(
+            `SELECT property_id
+             FROM rental_requests
+             WHERE id = ?`,
+            [requestId]
+        );
+
+        if (requestInfo.length === 0) {
+            await connection.rollback();
+            transactionStarted = false;
+
+            return res.status(404).json({
+                message: 'Rental request not found'
+            });
+        }
+
+        const propertyId = requestInfo[0].property_id;
+
+        // Lock the property first.
+        // This prevents two requests for the same property
+        // from being approved at the same time.
+        const [properties] = await connection.query(
+            `SELECT id, landlord_id, status
+             FROM properties
+             WHERE id = ?
+             FOR UPDATE`,
+            [propertyId]
+        );
+
+        if (properties.length === 0) {
+            await connection.rollback();
+            transactionStarted = false;
+
+            return res.status(404).json({
+                message: 'Property not found'
+            });
+        }
+
+        const property = properties[0];
+
+        // Check whether the logged-in landlord owns the property
+        if (Number(property.landlord_id) !== Number(landlordId)) {
+            await connection.rollback();
+            transactionStarted = false;
+
+            return res.status(403).json({
+                message: 'You do not own this property'
+            });
+        }
+
+        // Lock and retrieve the selected request
         const [requests] = await connection.query(
-            `SELECT
-                r.id,
-                r.property_id,
-                r.status AS request_status,
-                r.rental_start_date,
-                r.rental_end_date,
-                p.landlord_id,
-                p.status AS property_status
-             FROM rental_requests r
-             JOIN properties p ON r.property_id = p.id
-             WHERE r.id = ?
+            `SELECT id, property_id, status
+             FROM rental_requests
+             WHERE id = ?
              FOR UPDATE`,
             [requestId]
         );
 
         if (requests.length === 0) {
             await connection.rollback();
+            transactionStarted = false;
 
             return res.status(404).json({
                 message: 'Rental request not found'
@@ -245,18 +367,10 @@ exports.updateRentalRequestStatus = async (req, res) => {
 
         const request = requests[0];
 
-        // Check property ownership
-        if (Number(request.landlord_id) !== Number(landlordId)) {
+        // Make sure the request has not already been processed
+        if (request.status !== 'pending') {
             await connection.rollback();
-
-            return res.status(403).json({
-                message: 'You do not own this property'
-            });
-        }
-
-        // Check request status
-        if (request.request_status !== 'pending') {
-            await connection.rollback();
+            transactionStarted = false;
 
             return res.status(400).json({
                 message: 'This request has already been processed'
@@ -266,11 +380,12 @@ exports.updateRentalRequestStatus = async (req, res) => {
         if (status === 'approved') {
 
             // Check property availability
-            if (request.property_status !== 'available') {
+            if (property.status !== 'available') {
                 await connection.rollback();
+                transactionStarted = false;
 
                 return res.status(400).json({
-                    message: 'This property is no longer available'
+                    message: 'This property is already rented or unavailable'
                 });
             }
 
@@ -282,14 +397,14 @@ exports.updateRentalRequestStatus = async (req, res) => {
                 [requestId]
             );
 
-            // Reject other pending requests for the same property
+            // Reject all other pending requests for this property
             await connection.query(
                 `UPDATE rental_requests
                  SET status = 'rejected'
                  WHERE property_id = ?
                  AND id != ?
                  AND status = 'pending'`,
-                [request.property_id, requestId]
+                [propertyId, requestId]
             );
 
             // Mark property as rented
@@ -297,12 +412,12 @@ exports.updateRentalRequestStatus = async (req, res) => {
                 `UPDATE properties
                  SET status = 'rented'
                  WHERE id = ?`,
-                [request.property_id]
+                [propertyId]
             );
 
         } else {
 
-            // Reject selected request
+            // Reject only the selected request
             await connection.query(
                 `UPDATE rental_requests
                  SET status = 'rejected'
@@ -312,19 +427,22 @@ exports.updateRentalRequestStatus = async (req, res) => {
         }
 
         await connection.commit();
+        transactionStarted = false;
 
         return res.status(200).json({
             message: status === 'approved'
-                ? 'Rental request approved successfully'
+                ? 'Rental request approved successfully. Other pending requests for this property have been rejected.'
                 : 'Rental request rejected successfully',
 
-            requestId: requestId,
-            status: status
+            requestId,
+            propertyId,
+            status
         });
 
     } catch (error) {
-
-        await connection.rollback();
+        if (connection && transactionStarted) {
+            await connection.rollback();
+        }
 
         console.error('UPDATE RENTAL REQUEST ERROR:', error);
 
@@ -333,6 +451,8 @@ exports.updateRentalRequestStatus = async (req, res) => {
         });
 
     } finally {
-        connection.release();
+        if (connection) {
+            connection.release();
+        }
     }
 };

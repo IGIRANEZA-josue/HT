@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 
@@ -12,8 +11,7 @@ const authmiddleware = require('../middleware/authmiddleware');
 const accountTypeMiddleware = require('../middleware/accountTypeMiddleware');
 const roleMiddleware = require('../middleware/roleMiddleware');
 
-
-// CREATE RENTAL REQUEST - SEEKER
+// Create rental request
 router.post(
     '/addrentalrequest',
     authmiddleware,
@@ -22,8 +20,7 @@ router.post(
     createRentalRequest
 );
 
-
-// GET MY RENTAL REQUESTS - SEEKER AND LANDLORD
+// Get my rental requests
 router.get(
     '/getmyrentalrequests',
     authmiddleware,
@@ -31,8 +28,7 @@ router.get(
     getMyRentalRequests
 );
 
-
-// APPROVE OR REJECT RENTAL REQUEST - LANDLORD
+// Approve or reject rental request
 router.put(
     '/updaterequest/:id',
     authmiddleware,
@@ -40,6 +36,5 @@ router.put(
     roleMiddleware('landlord'),
     updateRentalRequestStatus
 );
-
 
 module.exports = router;
