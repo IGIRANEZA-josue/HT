@@ -98,8 +98,10 @@ exports.getProperty = async (req, res) => {
 };
 
 // ADD PROPERTY
+
 exports.addProperty = async (req, res) => {
     try {
+        // GET DATA FROM REQUEST BODY
         const {
             location_id,
             title,
@@ -110,12 +112,14 @@ exports.addProperty = async (req, res) => {
             monthly_rent
         } = req.body;
 
+        // CHECK REQUIRED FIELDS
         if (!location_id || !title || monthly_rent === undefined) {
             return res.status(400).json({
                 message: 'location_id, title and monthly_rent are required'
             });
         }
 
+        // CHECK USER ROLE
         if (
             req.user?.accountType !== 'user' ||
             req.user?.role !== 'landlord'
@@ -125,21 +129,25 @@ exports.addProperty = async (req, res) => {
             });
         }
 
+        // CONVERT VALUES
         const locationId = Number(location_id);
         const rent = Number(monthly_rent);
 
+        // VALIDATE LOCATION
         if (!Number.isInteger(locationId) || locationId <= 0) {
             return res.status(400).json({
                 message: 'Invalid location ID'
             });
         }
 
-        if (!Number.isFinite(rent) || rent < 0) {
+        // VALIDATE RENT
+        if (!Number.isFinite(rent) || rent <= 0) {
             return res.status(400).json({
                 message: 'Invalid monthly rent'
             });
         }
 
+        // CHECK IF LOCATION EXISTS
         const [locations] = await db.query(
             'SELECT id FROM location WHERE id = ?',
             [locationId]
@@ -151,11 +159,20 @@ exports.addProperty = async (req, res) => {
             });
         }
 
+        // INSERT PROPERTY
         const [result] = await db.query(
             `INSERT INTO properties
-             (landlord_id, location_id, title, description, property_type,
-              bedrooms, bathrooms, monthly_rent)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            (
+                landlord_id,
+                location_id,
+                title,
+                description,
+                property_type,
+                bedrooms,
+                bathrooms,
+                monthly_rent
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 req.user.id,
                 locationId,
@@ -174,9 +191,11 @@ exports.addProperty = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error('ADD PROPERTY ERROR:', error);
+
         return res.status(500).json({
-            message: 'Could not add property'
+            message: 'Could not add property',
+            error: error.message
         });
     }
 };
